@@ -1,6 +1,7 @@
 """
 Thermal comfort scoring module for GreenPath.
-Calculates walkability scores using weighted combination or ML model.
+Calculates walkability scores using weighted combination or trained ML models.
+Supports multiple ML models with proper evaluation metrics.
 """
 
 import numpy as np
@@ -11,6 +12,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 
 from config import WEIGHTS, CACHE_DIR
+
+# Path to trained models
+MODELS_DIR = os.path.join(CACHE_DIR, 'models')
 
 
 def calculate_weighted_score(hex_grid):
@@ -144,8 +148,8 @@ def calculate_ml_score(hex_grid, model=None, scaler=None):
 
     Args:
         hex_grid: GeoDataFrame with features
-        model: Trained model (or None to train new one)
-        scaler: Feature scaler (or None to create new one)
+        model: Trained model (or None to load best model)
+        scaler: Feature scaler (or None to load from saved model)
 
     Returns:
         GeoDataFrame with added 'comfort_score' column
@@ -153,7 +157,15 @@ def calculate_ml_score(hex_grid, model=None, scaler=None):
     hex_grid = hex_grid.copy()
 
     if model is None:
-        model, scaler = train_comfort_model(hex_grid)
+        # Try to load the trained best model
+        model_data = load_trained_model()
+        if model_data is not None:
+            model = model_data['model']
+            scaler = model_data['scaler']
+            print(f"Using trained model: {model_data.get('model_name', 'Unknown')}")
+        else:
+            # Fall back to training a new model
+            model, scaler = train_comfort_model(hex_grid)
 
     features = ['ndvi', 'lst', 'slope', 'shadow']
     X = hex_grid[features].values
@@ -163,6 +175,50 @@ def calculate_ml_score(hex_grid, model=None, scaler=None):
     hex_grid['comfort_score'] = hex_grid['comfort_score'].clip(0, 1)
 
     return hex_grid
+
+
+def load_trained_model():
+    """
+    Load the best trained model from the models directory.
+
+    Returns:
+        Dictionary with model, scaler, and metadata, or None if not found
+    """
+    model_path = os.path.join(MODELS_DIR, 'best_model.pkl')
+
+    if os.path.exists(model_path):
+        try:
+            model_data = pickle.load(open(model_path, 'rb'))
+            print(f"[OK] Loaded trained model from {model_path}")
+            return model_data
+        except Exception as e:
+            print(f"[WARN] Could not load model: {e}")
+            return None
+    else:
+        print(f"[INFO] No trained model found at {model_path}")
+        return None
+
+
+def train_and_save_model(hex_grid):
+    """
+    Train ML models using the full pipeline and save the best one.
+
+    Args:
+        hex_grid: GeoDataFrame with preprocessed features
+
+    Returns:
+        Dictionary with trained model and scaler
+    """
+    from ml_pipeline import run_ml_pipeline
+
+    print("\nRunning ML training pipeline...")
+    results = run_ml_pipeline(hex_grid, save_plots=True)
+
+    return {
+        'model': results['best_model'],
+        'scaler': results['scaler'],
+        'model_name': results['best_model_name']
+    }
 
 
 def calculate_comfort_scores(hex_grid, method='weighted'):

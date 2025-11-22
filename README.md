@@ -18,11 +18,14 @@ greenpath/
 ├── data_collection.py  # GEE and OSM data fetching
 ├── preprocessing.py    # NDVI, LST, slope calculations
 ├── scoring.py          # Thermal comfort scoring model
+├── ml_pipeline.py      # ML training and evaluation pipeline
 ├── routing.py          # Pathfinding algorithms
 ├── app.py              # Streamlit GUI interface
+├── test_pipeline.py    # Test script for pipeline and ML
 ├── requirements.txt    # Python dependencies
 ├── README.md           # This file
 └── cache/              # Cached data (created automatically)
+    └── models/         # Trained ML models
 ```
 
 ## Installation
@@ -166,12 +169,53 @@ Where:
 - `Slope_inv`: Inverted slope (0-1, higher = flatter)
 - `Shadow_norm`: Building shadow potential (0-1, higher = more shade)
 
-### Random Forest Method (Alternative)
-GreenPath also supports a machine learning approach using **Random Forest Regression**:
-- Generates synthetic UTCI (Universal Thermal Climate Index) labels based on the input features
-- Trains a RandomForestRegressor with 100 trees to predict comfort scores
-- Useful for capturing non-linear relationships between environmental factors
-- Can be enabled by changing the scoring method in `scoring.py`
+### Machine Learning Methods
+
+GreenPath includes a complete ML pipeline for predicting thermal comfort scores. The pipeline trains and compares multiple models:
+
+#### Models Implemented
+1. **Baseline Model**: Weighted average formula (benchmark)
+2. **Classical ML Models**:
+   - Linear Regression
+   - Ridge Regression (L2 regularization)
+   - Decision Tree Regressor
+   - Support Vector Regression (SVR)
+   - K-Nearest Neighbors (KNN)
+3. **Ensemble Methods**:
+   - Random Forest Regressor
+   - Gradient Boosting Regressor
+   - AdaBoost Regressor
+   - Stacking Ensemble
+
+#### ML Pipeline Features
+- **Train/Validation/Test Split**: 70%/10%/20% split for proper evaluation
+- **Cross-Validation**: 5-fold CV for robust performance estimation
+- **Hyperparameter Tuning**: GridSearchCV for optimal model configuration
+- **Feature Importance Analysis**: Understand which factors matter most
+- **Error Analysis**: Identify model weaknesses and failure cases
+- **Model Comparison**: Compare all models on RMSE, MAE, R² metrics
+
+#### Training Labels
+Training labels are generated using the UTCI (Universal Thermal Climate Index) formula:
+```python
+UTCI = 0.5 × air_temp + 0.3 × MRT + 0.1 × humidity/10 - 0.3 × wind_speed + 0.2 × slope
+```
+Where MRT (Mean Radiant Temperature) is estimated from LST, NDVI, and shadow data.
+
+#### Running the ML Pipeline
+```bash
+# Train all models and compare
+python test_pipeline.py ml
+
+# Run complete test (basic + ML)
+python test_pipeline.py all
+```
+
+Results are saved to `cache/models/`:
+- `best_model.pkl`: Best performing model
+- `model_comparison.csv`: Comparison table
+- `model_comparison.png`: Visualization
+- `model_metrics.json`: Best model metrics
 
 ## Sample City Data
 

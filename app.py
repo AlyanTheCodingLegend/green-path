@@ -56,8 +56,8 @@ def load_city_data(city_name):
     # Preprocess
     hex_grid = preprocess_data(raw_data)
 
-    # Calculate scores
-    hex_grid = calculate_comfort_scores(hex_grid)
+    # Calculate scores using ML model if available, otherwise weighted
+    hex_grid = calculate_comfort_scores(hex_grid, method='ml')
 
     # Assign scores to road network
     G = assign_comfort_to_edges(raw_data['roads'], hex_grid)
