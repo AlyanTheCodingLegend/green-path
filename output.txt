@@ -1,0 +1,20 @@
+Loading city data...
+
+Scanning edges around start node 5703123758...
+Edge 5703123758->5703123760: Length=19.0m, Comfort=0.85, DiscomfortCost=0.1235
+Edge 5703123758->6828231049: Length=15.1m, Comfort=0.85, DiscomfortCost=0.1235
+Edge 5703123758->6828231050: Length=168.4m, Comfort=0.85, DiscomfortCost=0.1239
+
+Running Comparison with W_C=4.0, W_D=0.5...
+
+Fast Route Analysis:
+  Length: 1888.1m
+  Avg Comfort: 0.7059
+  Calculated Algo Cost: 50.0117
+
+Cool Route Analysis:
+  Length: 2379.5m
+  Avg Comfort: 0.6731
+  Calculated Algo Cost: 68.2159
+
+[ANOMALY DETECTED]: Fast Route has higher comfort than Cool Route!

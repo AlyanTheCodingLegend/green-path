@@ -75,8 +75,8 @@ WEIGHTS = {
 CLOUD_COVER_MAX = 20  # Maximum cloud cover percentage
 
 # Routing parameters
-COMFORT_WEIGHT = 0.7  # Weight for comfort vs distance in cool route
-DISTANCE_WEIGHT = 0.3
+COMFORT_WEIGHT = 4.0  # Weight for comfort vs distance in cool route
+DISTANCE_WEIGHT = 0.5
 
 # Cache settings
 import os as _os

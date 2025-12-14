@@ -107,8 +107,7 @@ def load_city_data_with_progress(city_name, tracker):
         tracker.emit(f"Successfully loaded {city_name} data", 100)
         return hex_grid, G, raw_data
 
-    except Exception as e:
-        tracker.error(f"Error loading city data: {str(e)}")
+    except Exception:
         raise
 
 
@@ -197,9 +196,13 @@ def load_city_data_endpoint(city_name):
     def load_in_background():
         tracker = ProgressTracker(operation_id)
         try:
+            print(f"Starting data loading for {city_name}...") 
             hex_grid, G, raw_data = load_city_data_with_progress(city_name, tracker)
             tracker.complete({'city': city_name})
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"Error in background thread: {e}")
             tracker.error(str(e))
 
     thread = threading.Thread(target=load_in_background)
@@ -235,14 +238,18 @@ def progress_stream(operation_id):
                 # Send keepalive
                 yield f"data: {json.dumps({'keepalive': True})}\n\n"
 
-    return Response(
+    response = Response(
         stream_with_context(generate()),
         mimetype='text/event-stream',
         headers={
             'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no'
+            'X-Accel-Buffering': 'no',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Methods': 'GET'
         }
     )
+    return response
 
 
 @app.route('/api/routes/compare', methods=['POST'])

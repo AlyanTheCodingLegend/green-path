@@ -600,15 +600,30 @@ def fetch_osm_roads_for_bbox(bbox):
     """Fetch OSM road network for a specific bounding box."""
     print("Fetching OSM road network...")
 
-    try:
-        bbox_tuple = (bbox['min_lon'], bbox['min_lat'], bbox['max_lon'], bbox['max_lat'])
-        G = ox.graph_from_bbox(bbox=bbox_tuple, network_type='walk', simplify=True)
-        G = ox.project_graph(G)
-        print(f"[OK] Fetched road network: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
-        return G
-    except Exception as e:
-        print(f"[FAIL] Error fetching road network: {e}")
-        raise
+    import time
+
+    bbox_tuple = (bbox['min_lon'], bbox['min_lat'], bbox['max_lon'], bbox['max_lat'])
+    
+    # Retry up to 3 times with increasing timeout
+    for attempt in range(3):
+        try:
+            # Configure OSMnx to use longer timeout
+            ox.settings.timeout = 180  # 3 minutes
+            ox.settings.memory = None
+
+            G = ox.graph_from_bbox(bbox=bbox_tuple, network_type='walk', simplify=True)
+            G = ox.project_graph(G)
+            print(f"[OK] Fetched road network: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+            return G
+            
+        except Exception as e:
+            print(f"[WARN] Attempt {attempt + 1} failed: {e}")
+            if attempt < 2:
+                print(f"  Retrying in {(attempt + 1) * 5} seconds...")
+                time.sleep((attempt + 1) * 5)
+            else:
+                print(f"[FAIL] Could not fetch road network after 3 attempts")
+                raise
 
 
 def fetch_osm_buildings_for_bbox(bbox):

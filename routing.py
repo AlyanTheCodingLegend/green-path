@@ -131,21 +131,10 @@ def find_coolest_route(G, start_node, end_node, comfort_weight=None, distance_we
     Returns:
         List of node IDs forming the path, or None if no path exists
     """
-    if comfort_weight is None or distance_weight is None:
-        # Try to load ML-optimized weights
-        try:
-            from ml_pipeline import load_optimal_weights
-            opt_comfort, opt_distance = load_optimal_weights()
-            if comfort_weight is None:
-                comfort_weight = opt_comfort
-            if distance_weight is None:
-                distance_weight = opt_distance
-        except:
-            # Fall back to config defaults
-            if comfort_weight is None:
-                comfort_weight = COMFORT_WEIGHT
-            if distance_weight is None:
-                distance_weight = DISTANCE_WEIGHT
+    if comfort_weight is None:
+        comfort_weight = COMFORT_WEIGHT
+    if distance_weight is None:
+        distance_weight = DISTANCE_WEIGHT
 
     # Calculate combined cost for each edge
     def combined_cost(u, v, data):
