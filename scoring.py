@@ -84,25 +84,29 @@ def calculate_synthetic_utci(hex_grid, air_temp=35, humidity=40, wind_speed=2):
     return utci
 
 
-def train_comfort_model(hex_grid):
+def train_comfort_model(hex_grid, city_name='default'):
     """
     Train a Random Forest model to predict comfort scores.
     Uses synthetic UTCI as pseudo-labels for training.
 
     Args:
         hex_grid: GeoDataFrame with all features
+        city_name: Name of the city for caching
 
     Returns:
         Trained model and scaler
     """
-    cache_path = os.path.join(CACHE_DIR, 'comfort_model.pkl')
+    # Use city-specific cache directory
+    city_dir = os.path.join(CACHE_DIR, city_name.lower())
+    os.makedirs(city_dir, exist_ok=True)
+    cache_path = os.path.join(city_dir, 'comfort_model.pkl')
 
     if os.path.exists(cache_path):
-        print("Loading comfort model from cache...")
+        print(f"Loading comfort model for {city_name} from cache...")
         model_data = pickle.load(open(cache_path, 'rb'))
         return model_data['model'], model_data['scaler']
 
-    print("Training comfort scoring model...")
+    print(f"Training comfort scoring model for {city_name}...")
 
     # Features for the model
     features = ['ndvi', 'lst', 'slope', 'shadow']
@@ -112,9 +116,14 @@ def train_comfort_model(hex_grid):
     utci = calculate_synthetic_utci(hex_grid)
 
     # Convert UTCI to comfort score (invert so higher = more comfortable)
-    # Normalize to 0-1 range
+    # Normalize to 0-1 range based on LOCAL min/max
     utci_min, utci_max = utci.min(), utci.max()
-    y = 1 - (utci - utci_min) / (utci_max - utci_min + 1e-6)
+    
+    # Handle case with no variation
+    if abs(utci_max - utci_min) < 1e-6:
+        y = np.full(len(utci), 0.5) # Default to fair if no variation
+    else:
+        y = 1 - (utci - utci_min) / (utci_max - utci_min)
 
     # Scale features
     scaler = StandardScaler()
@@ -131,7 +140,6 @@ def train_comfort_model(hex_grid):
     model.fit(X_scaled, y)
 
     # Cache the model
-    os.makedirs(CACHE_DIR, exist_ok=True)
     pickle.dump({'model': model, 'scaler': scaler}, open(cache_path, 'wb'))
 
     # Print feature importance
@@ -142,7 +150,7 @@ def train_comfort_model(hex_grid):
     return model, scaler
 
 
-def calculate_ml_score(hex_grid, model=None, scaler=None):
+def calculate_ml_score(hex_grid, model=None, scaler=None, city_name='default'):
     """
     Calculate comfort score using ML model.
 
@@ -150,6 +158,7 @@ def calculate_ml_score(hex_grid, model=None, scaler=None):
         hex_grid: GeoDataFrame with features
         model: Trained model (or None to load best model)
         scaler: Feature scaler (or None to load from saved model)
+        city_name: Name of the city for loading city-specific model
 
     Returns:
         GeoDataFrame with added 'comfort_score' column
@@ -157,15 +166,15 @@ def calculate_ml_score(hex_grid, model=None, scaler=None):
     hex_grid = hex_grid.copy()
 
     if model is None:
-        # Try to load the trained best model
-        model_data = load_trained_model()
+        # Try to load the trained best model (global)
+        model_data = load_trained_model(city_name)
         if model_data is not None:
             model = model_data['model']
             scaler = model_data['scaler']
             print(f"Using trained model: {model_data.get('model_name', 'Unknown')}")
         else:
-            # Fall back to training a new model
-            model, scaler = train_comfort_model(hex_grid)
+            # Fall back to training a new model for this city
+            model, scaler = train_comfort_model(hex_grid, city_name)
 
     features = ['ndvi', 'lst', 'slope', 'shadow']
     X = hex_grid[features].values
@@ -177,32 +186,44 @@ def calculate_ml_score(hex_grid, model=None, scaler=None):
     return hex_grid
 
 
-def load_trained_model():
+def load_trained_model(city_name='default'):
     """
     Load the best trained model from the models directory.
+    Checks city-specific models first, then global models.
 
     Returns:
         Dictionary with model, scaler, and metadata, or None if not found
     """
-    model_path = os.path.join(MODELS_DIR, 'best_model.pkl')
-
-    if os.path.exists(model_path):
+    # 1. Try city-specific best model
+    city_model_path = os.path.join(CACHE_DIR, city_name.lower(), 'best_model.pkl')
+    if os.path.exists(city_model_path):
         try:
-            model_data = pickle.load(open(model_path, 'rb'))
-            print(f"[OK] Loaded trained model from {model_path}")
+            model_data = pickle.load(open(city_model_path, 'rb'))
+            print(f"[OK] Loaded trained model for {city_name}")
+            return model_data
+        except Exception:
+            pass
+            
+    # 2. Try global best model
+    global_model_path = os.path.join(MODELS_DIR, 'best_model.pkl')
+
+    if os.path.exists(global_model_path):
+        try:
+            model_data = pickle.load(open(global_model_path, 'rb'))
+            print(f"[OK] Loaded global trained model from {global_model_path}")
             return model_data
         except Exception as e:
             print(f"[WARN] Could not load model: {e}")
             return None
     else:
-        print(f"[INFO] No trained model found at {model_path}")
+        # Don't spam warnings if just falling back to on-the-fly training
         return None
 
 
 def train_and_save_model(hex_grid):
     """
     Train ML models using the full pipeline and save the best one.
-
+    
     Args:
         hex_grid: GeoDataFrame with preprocessed features
 
@@ -221,23 +242,24 @@ def train_and_save_model(hex_grid):
     }
 
 
-def calculate_comfort_scores(hex_grid, method='weighted'):
+def calculate_comfort_scores(hex_grid, method='weighted', city_name='default'):
     """
     Main function to calculate comfort scores.
 
     Args:
         hex_grid: GeoDataFrame with preprocessed features
         method: 'weighted' for simple weighted sum, 'ml' for Random Forest
+        city_name: Name of the city (for ML model caching)
 
     Returns:
         GeoDataFrame with comfort scores
     """
-    print(f"\nCalculating comfort scores using {method} method...")
+    print(f"\nCalculating comfort scores using {method} method for {city_name}...")
 
     if method == 'weighted':
         hex_grid = calculate_weighted_score(hex_grid)
     elif method == 'ml':
-        hex_grid = calculate_ml_score(hex_grid)
+        hex_grid = calculate_ml_score(hex_grid, city_name=city_name)
     else:
         raise ValueError(f"Unknown method: {method}")
 

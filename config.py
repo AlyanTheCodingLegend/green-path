@@ -90,7 +90,7 @@ ROUTE_FAST_COLOR = '#D32F2F'  # Red
 HEATMAP_COLORMAP = 'RdYlGn'   # Red-Yellow-Green
 
 # GEE settings
-GEE_PROJECT = 'gen-lang-client-0880179153'
+GEE_PROJECT = 'ml-proj-481211'
 
 # Export settings
 EXPORT_FORMAT = 'gpx'

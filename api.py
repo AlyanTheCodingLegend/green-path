@@ -90,7 +90,7 @@ def load_city_data_with_progress(city_name, tracker):
         hex_grid = preprocess_data(raw_data)
 
         tracker.emit("Calculating thermal comfort scores...", 60)
-        hex_grid = calculate_comfort_scores(hex_grid, method='ml')
+        hex_grid = calculate_comfort_scores(hex_grid, method='ml', city_name=city_name)
 
         tracker.emit("Assigning scores to road network...", 80)
         G = assign_comfort_to_edges(raw_data['roads'], hex_grid)
