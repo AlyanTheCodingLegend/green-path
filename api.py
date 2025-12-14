@@ -244,9 +244,7 @@ def progress_stream(operation_id):
         headers={
             'Cache-Control': 'no-cache',
             'X-Accel-Buffering': 'no',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Access-Control-Allow-Methods': 'GET'
+            'Connection': 'keep-alive'
         }
     )
     return response
